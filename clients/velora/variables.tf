@@ -15,9 +15,15 @@ variable "resource_group_name" {
 }
 
 variable "location" {
-  description = "Primary region for all data/pipeline resources. Per DECISIONS.md #10."
+  description = "Primary region for data/pipeline resources. Per DECISIONS.md #10."
   type        = string
   default     = "centralindia"
+}
+
+variable "openai_location" {
+  description = "Azure OpenAI region. Split from primary region per DECISIONS #25 — southindia is closest India region with OpenAI."
+  type        = string
+  default     = "southindia"
 }
 
 variable "environment" {
@@ -46,4 +52,15 @@ variable "kv_purge_protection_enabled" {
   description = "Key Vault purge protection. Cannot be disabled once enabled — keep false in dev."
   type        = bool
   default     = false
+}
+
+variable "current_user_upn" {
+  description = "UPN of the identity running terraform. Set as AAD admin on PostgreSQL + Azure SQL."
+  type        = string
+}
+
+variable "current_ip" {
+  description = "Public IPv4 to whitelist for local psql/sqlcmd access. null skips whitelist (Azure-services rule still applies)."
+  type        = string
+  default     = null
 }

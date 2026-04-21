@@ -1,3 +1,5 @@
+data "azurerm_client_config" "current" {}
+
 data "azurerm_resource_group" "this" {
   name = var.resource_group_name
 }
@@ -48,4 +50,100 @@ module "adls" {
   containers          = ["landing", "bronze", "silver", "gold", "quarantine"]
 
   tags = local.common_tags
+}
+
+module "postgres" {
+  source = "../../core/postgres"
+
+  name                        = "${local.name_prefix}-pg-${local.name_suffix}"
+  resource_group_name         = data.azurerm_resource_group.this.name
+  location                    = data.azurerm_resource_group.this.location
+  current_user_principal_name = var.current_user_upn
+  current_ip                  = var.current_ip
+
+  tags = local.common_tags
+}
+
+module "databricks" {
+  source = "../../core/databricks"
+
+  name                = "${local.name_prefix}-dbx-${local.name_suffix}"
+  resource_group_name = data.azurerm_resource_group.this.name
+  location            = data.azurerm_resource_group.this.location
+
+  tags = local.common_tags
+}
+
+module "azure_sql_velora" {
+  source = "../../source_connectors/azure_sql"
+
+  server_name         = "${local.name_prefix}-sql-velora-${local.name_suffix}"
+  database_name       = "velora_oms"
+  resource_group_name = data.azurerm_resource_group.this.name
+  location            = data.azurerm_resource_group.this.location
+
+  aad_admin_login     = var.current_user_upn
+  aad_admin_object_id = data.azurerm_client_config.current.object_id
+
+  current_ip = var.current_ip
+
+  tags = local.common_tags
+}
+
+module "openai" {
+  source = "../../core/openai"
+
+  name                = "${local.name_prefix}-openai-${local.name_suffix}"
+  resource_group_name = data.azurerm_resource_group.this.name
+  location            = var.openai_location
+
+  tags = local.common_tags
+}
+
+resource "azurerm_key_vault_secret" "postgres_admin_password" {
+  name         = "postgres-admin-password"
+  value        = module.postgres.admin_password
+  key_vault_id = module.key_vault.id
+
+  depends_on = [module.key_vault]
+}
+
+resource "azurerm_key_vault_secret" "postgres_connection_string" {
+  name         = "postgres-connection-string"
+  value        = "host=${module.postgres.fqdn} port=5432 dbname=postgres user=${module.postgres.admin_login} password=${module.postgres.admin_password} sslmode=require"
+  key_vault_id = module.key_vault.id
+
+  depends_on = [module.key_vault]
+}
+
+resource "azurerm_key_vault_secret" "sql_admin_password" {
+  name         = "sql-admin-password"
+  value        = module.azure_sql_velora.admin_password
+  key_vault_id = module.key_vault.id
+
+  depends_on = [module.key_vault]
+}
+
+resource "azurerm_key_vault_secret" "sql_connection_string" {
+  name         = "sql-connection-string"
+  value        = "Server=tcp:${module.azure_sql_velora.server_fqdn},1433;Initial Catalog=${module.azure_sql_velora.database_name};User ID=${module.azure_sql_velora.admin_login};Password=${module.azure_sql_velora.admin_password};Encrypt=true;TrustServerCertificate=false;"
+  key_vault_id = module.key_vault.id
+
+  depends_on = [module.key_vault]
+}
+
+resource "azurerm_key_vault_secret" "openai_api_key" {
+  name         = "openai-api-key"
+  value        = module.openai.primary_access_key
+  key_vault_id = module.key_vault.id
+
+  depends_on = [module.key_vault]
+}
+
+resource "azurerm_key_vault_secret" "openai_endpoint" {
+  name         = "openai-endpoint"
+  value        = module.openai.endpoint
+  key_vault_id = module.key_vault.id
+
+  depends_on = [module.key_vault]
 }
