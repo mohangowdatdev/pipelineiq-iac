@@ -81,3 +81,48 @@ output "sql_database_name" {
 output "sql_admin_login" {
   value = module.azure_sql_velora.admin_login
 }
+
+# ------------------------------------------------------------
+# Tier 5 — Unity Catalog
+# ------------------------------------------------------------
+
+output "uc_metastore_id" {
+  value = module.databricks_uc.metastore_id
+}
+
+output "uc_metastore_name" {
+  value = module.databricks_uc.metastore_name
+}
+
+output "uc_catalogs" {
+  value = module.databricks_uc.catalog_names
+}
+
+output "uc_external_locations" {
+  value = module.databricks_uc.external_location_names
+}
+
+output "uc_storage_credential" {
+  value = module.databricks_uc.storage_credential_name
+}
+
+output "uc_access_connector_id" {
+  value = module.databricks_uc.access_connector_id
+}
+
+output "databricks_cluster_policy_id" {
+  value = module.databricks_uc.cluster_policy_id
+}
+
+output "databricks_sql_warehouse_id" {
+  value = module.databricks_uc.sql_warehouse_id
+}
+
+output "databricks_sql_warehouse_jdbc_url" {
+  value     = module.databricks_uc.sql_warehouse_jdbc_url
+  sensitive = true
+}
+
+output "databricks_secret_scope" {
+  value = module.databricks_uc.secret_scope_name
+}

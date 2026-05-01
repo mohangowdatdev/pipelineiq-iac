@@ -100,6 +100,39 @@ module "openai" {
   tags = local.common_tags
 }
 
+module "databricks_uc" {
+  source = "../../core/databricks_uc"
+
+  providers = {
+    databricks.workspace = databricks.workspace
+    databricks.accounts  = databricks.accounts
+  }
+
+  name_prefix         = "${local.name_prefix}-${local.name_suffix}"
+  resource_group_name = data.azurerm_resource_group.this.name
+  location            = data.azurerm_resource_group.this.location
+
+  workspace_id          = module.databricks.workspace_id
+  workspace_resource_id = module.databricks.id
+
+  adls_account_id   = module.adls.id
+  adls_account_name = module.adls.storage_account_name
+
+  key_vault_id  = module.key_vault.id
+  key_vault_uri = module.key_vault.uri
+
+  # Adopt the auto-created system metastore for centralindia (1-per-region limit).
+  metastore_id = "a2d5ffb1-1ac9-42ec-babb-80eacf4ba2fb"
+
+  tags = local.common_tags
+
+  depends_on = [
+    module.databricks,
+    module.adls,
+    module.key_vault,
+  ]
+}
+
 resource "azurerm_key_vault_secret" "postgres_admin_password" {
   name         = "postgres-admin-password"
   value        = module.postgres.admin_password

@@ -64,3 +64,8 @@ variable "current_ip" {
   type        = string
   default     = null
 }
+
+variable "databricks_account_id" {
+  description = "Databricks account UUID. Find it at https://accounts.azuredatabricks.net (top-right user menu → 'Account ID', or end of URL after login). One per Azure tenant."
+  type        = string
+}

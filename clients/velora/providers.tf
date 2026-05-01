@@ -13,3 +13,21 @@ provider "azurerm" {
     }
   }
 }
+
+# Workspace-scoped provider — for cluster policy, SQL warehouse, secret scope,
+# storage credential, external locations, catalogs (post-attachment).
+# Uses az CLI auth — running principal must be a workspace user/admin.
+provider "databricks" {
+  alias     = "workspace"
+  host      = module.databricks.workspace_url
+  auth_type = "azure-cli"
+}
+
+# Account-scoped provider — for metastore creation and assignment.
+# Uses az CLI auth — running principal must be a Databricks Account Admin.
+provider "databricks" {
+  alias      = "accounts"
+  host       = "https://accounts.azuredatabricks.net"
+  account_id = var.databricks_account_id
+  auth_type  = "azure-cli"
+}
