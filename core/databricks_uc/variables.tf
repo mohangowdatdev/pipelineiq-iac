@@ -40,7 +40,7 @@ variable "containers" {
 variable "catalogs" {
   description = "UC catalogs to create. Each is rooted at abfss://{name}@{adls}/."
   type        = list(string)
-  default     = ["bronze", "silver", "gold"]
+  default     = ["bronze", "silver", "gold", "quarantine"]
 }
 
 variable "key_vault_id" {
