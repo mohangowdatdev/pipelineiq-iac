@@ -159,6 +159,29 @@ module "functions" {
   ]
 }
 
+# Logic App that fires daily at 00:30 UTC (06:00 IST) and POSTs to the
+# Function App admin endpoint. Replaces the unreliable Flex timer trigger
+# as the source of truth for the daily generator schedule. The function's
+# timerTrigger remains registered as a happy-bonus fallback (idempotency
+# guard from DECISIONS #51 makes a double-fire safe).
+module "scheduler" {
+  source = "../../core/scheduler"
+
+  name                = "${local.name_prefix}-scheduler-${local.name_suffix}"
+  resource_group_name = data.azurerm_resource_group.this.name
+  location            = data.azurerm_resource_group.this.location
+
+  target_function_app_name = module.functions.name
+  target_function_name     = "generator"
+
+  schedule_hour_utc   = 0
+  schedule_minute_utc = 30
+
+  tags = local.common_tags
+
+  depends_on = [module.functions]
+}
+
 resource "azurerm_key_vault_secret" "postgres_admin_password" {
   name         = "postgres-admin-password"
   value        = module.postgres.admin_password
