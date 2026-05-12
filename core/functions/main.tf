@@ -133,3 +133,28 @@ resource "azurerm_role_assignment" "func_kv_secrets_user" {
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_function_app_flex_consumption.this.identity[0].principal_id
 }
+
+# ------------------------------------------------------------
+# Diagnostic settings — platform-side host logs to LA workspace.
+#
+# Separate observability layer from App Insights (which carries user-code
+# traces). FunctionAppLogs captures host startup, function-host-worker
+# lifecycle, and any platform-side termination events. Critical for
+# diagnosing the host-side worker reaping we hit on 2026-05-11 / 5-12 fires
+# where the Python worker died silently mid-inventory-write with no
+# user-code exception emitted.
+# ------------------------------------------------------------
+
+resource "azurerm_monitor_diagnostic_setting" "function_app" {
+  name                       = "${var.name}-diagnostics"
+  target_resource_id         = azurerm_function_app_flex_consumption.this.id
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+
+  enabled_log {
+    category = "FunctionAppLogs"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
+  }
+}
