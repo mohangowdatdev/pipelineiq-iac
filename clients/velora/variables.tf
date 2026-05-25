@@ -69,3 +69,8 @@ variable "databricks_account_id" {
   description = "Databricks account UUID. Find it at https://accounts.azuredatabricks.net (top-right user menu → 'Account ID', or end of URL after login). One per Azure tenant."
   type        = string
 }
+
+variable "azure_databricks_sp_object_id" {
+  description = "Tenant-scoped object_id of the AzureDatabricks first-party Service Principal (well-known app id 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d). Used to grant KV access for the secret scope. Look up with `az ad sp show --id 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d --query id -o tsv`."
+  type        = string
+}

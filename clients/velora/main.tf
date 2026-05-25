@@ -124,6 +124,9 @@ module "databricks_uc" {
   # Adopt the auto-created system metastore for centralindia (1-per-region limit).
   metastore_id = "a2d5ffb1-1ac9-42ec-babb-80eacf4ba2fb"
 
+  # AzureDatabricks first-party SP object_id (this tenant) — for KV secret scope.
+  azure_databricks_sp_object_id = var.azure_databricks_sp_object_id
+
   tags = local.common_tags
 
   depends_on = [
@@ -180,6 +183,31 @@ module "scheduler" {
   tags = local.common_tags
 
   depends_on = [module.functions]
+}
+
+# ── Source-system simulator — daily inventory snapshot on Databricks ─────────
+# Fires at 00:35 UTC daily, 5 min after the Function fire at 00:30. Replaces
+# the Function-App-based inventory write (DECISIONS #71 — supersedes #62 +
+# #69). Function App on FC1 Flex could not push 189K rows reliably; Spark
+# JDBC bulk insert from Databricks Jobs Compute does it in ~3-4 min.
+#
+# Notebook is uploaded to the workspace path via
+# `scripts/run_inventory_smoke.py` in PipelineIQ-Architecture, same pattern
+# as bronze/silver/gold notebooks. This module owns the scheduled Job only.
+module "inventory_workflow" {
+  source = "../../core/inventory_workflow"
+
+  providers = {
+    databricks.workspace = databricks.workspace
+  }
+
+  name                    = "${local.name_prefix}-inventory-${local.name_suffix}"
+  workspace_notebook_path = "/Shared/pipelineiq/source_sim/write_inventory_snapshot"
+  cluster_policy_id       = module.databricks_uc.cluster_policy_id
+
+  tags = local.common_tags
+
+  depends_on = [module.databricks_uc]
 }
 
 resource "azurerm_key_vault_secret" "postgres_admin_password" {

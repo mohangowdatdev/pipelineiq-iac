@@ -83,3 +83,18 @@ variable "cluster_policy_max_workers" {
   type    = number
   default = 2
 }
+
+variable "azure_databricks_sp_object_id" {
+  description = <<-EOT
+    Object ID of the AzureDatabricks first-party Service Principal in this
+    tenant. Used to grant the KV-backed secret scope read access to KV
+    secrets. Look up with:
+
+      az ad sp show --id 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d \
+        --query id -o tsv
+
+    (2ff814a6-... is the universal AzureDatabricks app ID. Its tenant-scoped
+    object_id is stable per tenant; only changes if the tenant is recreated.)
+  EOT
+  type        = string
+}

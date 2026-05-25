@@ -158,3 +158,15 @@ resource "databricks_secret_scope" "kv" {
     dns_name    = var.key_vault_uri
   }
 }
+
+# KV-backed secret scopes call Key Vault on the workspace's behalf via the
+# AzureDatabricks first-party Service Principal — NOT via the access connector
+# MSI. The SP needs the RBAC "Key Vault Secrets User" role on the vault to
+# read any secret. Surfaced when the inventory-snapshot notebook tried to
+# pull `sql-admin-password` (S14, DECISIONS #71).
+resource "azurerm_role_assignment" "databricks_kv_secrets_user" {
+  scope                = var.key_vault_id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = var.azure_databricks_sp_object_id
+  description          = "Lets KV-backed secret scope read secrets from Key Vault"
+}
