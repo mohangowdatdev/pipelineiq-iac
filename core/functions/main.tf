@@ -117,6 +117,16 @@ resource "azurerm_function_app_flex_consumption" "this" {
       "AzureWebJobsFeatureFlags"        = "EnableWorkerIndexing"
       "PYTHON_ENABLE_WORKER_EXTENSIONS" = "1"
       "KEY_VAULT_URI"                   = var.key_vault_uri
+
+      # Postgres control-plane connection string for the V2 HTTP endpoints
+      # (get_watermark / commit_watermark / register_file / log_run_start /
+      # log_run_end — S16, DECISIONS #72). Resolved at runtime from Key Vault
+      # via an App Settings reference; the FA MSI reads it through the
+      # func_kv_secrets_user role assignment below. Adopted into IaC in S17
+      # after being set out-of-band via `az` CLI in S16 (drift fix). The FA
+      # MSI must hold "Key Vault Secrets User" (granted below) for the
+      # reference to resolve.
+      "POSTGRES_URL" = "@Microsoft.KeyVault(VaultName=pipelineiq-kv-dev;SecretName=postgres-connection-string)"
     },
     var.app_settings,
   )
