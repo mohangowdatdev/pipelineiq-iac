@@ -62,6 +62,11 @@ output "databricks_workspace_url" {
   value = module.databricks.workspace_url
 }
 
+output "databricks_workspace_arm_id" {
+  description = "ARM resource ID of the Databricks workspace. Consumed by the ADF Databricks linked service (MSI auth)."
+  value       = module.databricks.id
+}
+
 output "openai_endpoint" {
   value = module.openai.endpoint
 }
@@ -142,4 +147,17 @@ output "functions_default_hostname" {
 output "functions_principal_id" {
   description = "Object ID of the Function App MSI. Used to grant Azure SQL + other resource access."
   value       = module.functions.principal_id
+}
+
+# ------------------------------------------------------------
+# Tier 6 — Azure Data Factory
+# ------------------------------------------------------------
+
+output "adf_name" {
+  value = module.adf.name
+}
+
+output "adf_principal_id" {
+  description = "Object ID of the ADF MSI. Surfaced as a Databricks workspace user on first REST call (chunk 2)."
+  value       = module.adf.principal_id
 }

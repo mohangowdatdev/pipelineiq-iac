@@ -210,6 +210,32 @@ module "inventory_workflow" {
   depends_on = [module.databricks_uc]
 }
 
+# ── Tier 6 — Azure Data Factory orchestration backbone ──────────────────────
+# Owns the factory resource + its MI RBAC only. ADF-internal objects (linked
+# services, datasets, pipelines) are Bicep under PipelineIQ-IaC/bicep/adf/,
+# published via scripts/deploy_adf.sh. build_order 6.1. Databricks linked
+# service uses MSI auth (no PAT to rotate) — the factory MI gets Contributor
+# on the workspace below.
+module "adf" {
+  source = "../../core/adf"
+
+  name                = "${local.name_prefix}-adf-${local.name_suffix}"
+  resource_group_name = data.azurerm_resource_group.this.name
+  location            = data.azurerm_resource_group.this.location
+
+  adls_account_id         = module.adls.id
+  key_vault_id            = module.key_vault.id
+  databricks_workspace_id = module.databricks.id
+
+  tags = local.common_tags
+
+  depends_on = [
+    module.adls,
+    module.key_vault,
+    module.databricks,
+  ]
+}
+
 resource "azurerm_key_vault_secret" "postgres_admin_password" {
   name         = "postgres-admin-password"
   value        = module.postgres.admin_password
