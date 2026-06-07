@@ -25,6 +25,9 @@ param databricksWorkspaceUrl string
 @description('Databricks workspace ARM resource ID.')
 param databricksWorkspaceResourceId string
 
+@description('Function App base URL, e.g. https://pipelineiq-functions-dev.azurewebsites.net (chunk 2).')
+param functionAppUrl string
+
 // ── Linked services ────────────────────────────────────────────────────────
 
 module lsKeyVault 'linkedservice_keyvault.bicep' = {
@@ -83,5 +86,42 @@ module dsAdlsSink 'dataset_adls_sink.bicep' = {
   }
   dependsOn: [
     lsAdls
+  ]
+}
+
+// ── Chunk 2: Function linked service + master copy pipeline + daily trigger ──
+
+module lsFunction 'linkedservice_function.bicep' = {
+  name: 'ls_function'
+  params: {
+    factoryName: factoryName
+    functionAppUrl: functionAppUrl
+  }
+  dependsOn: [
+    lsKeyVault
+  ]
+}
+
+module plMasterCopy 'pipeline_master_copy.bicep' = {
+  name: 'pl_master_copy'
+  params: {
+    factoryName: factoryName
+  }
+  dependsOn: [
+    dsSqlSource
+    dsAdlsSink
+    lsFunction
+    lsDatabricks
+  ]
+}
+
+// Created Stopped — started only at cutover (build_order 6.11).
+module trgDaily 'trigger_daily.bicep' = {
+  name: 'trg_daily_0040'
+  params: {
+    factoryName: factoryName
+  }
+  dependsOn: [
+    plMasterCopy
   ]
 }

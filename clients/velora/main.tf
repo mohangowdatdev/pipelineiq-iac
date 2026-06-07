@@ -223,9 +223,10 @@ module "adf" {
   resource_group_name = data.azurerm_resource_group.this.name
   location            = data.azurerm_resource_group.this.location
 
-  adls_account_id         = module.adls.id
-  key_vault_id            = module.key_vault.id
-  databricks_workspace_id = module.databricks.id
+  adls_account_id            = module.adls.id
+  key_vault_id               = module.key_vault.id
+  databricks_workspace_id    = module.databricks.id
+  log_analytics_workspace_id = module.log_analytics.id
 
   tags = local.common_tags
 
@@ -233,7 +234,27 @@ module "adf" {
     module.adls,
     module.key_vault,
     module.databricks,
+    module.log_analytics,
   ]
+}
+
+# Function App host default key → Key Vault, so the ADF AzureFunction linked
+# service (ls_function) can resolve it at runtime via ls_keyvault (the factory
+# MI has Key Vault Secrets User). Same host-key source as core/scheduler's
+# Logic App. build_order 6.12 / DECISIONS #75.
+data "azurerm_function_app_host_keys" "functions" {
+  name                = module.functions.name
+  resource_group_name = data.azurerm_resource_group.this.name
+
+  depends_on = [module.functions]
+}
+
+resource "azurerm_key_vault_secret" "functions_host_key" {
+  name         = "functions-host-key"
+  value        = data.azurerm_function_app_host_keys.functions.primary_key
+  key_vault_id = module.key_vault.id
+
+  depends_on = [module.key_vault, module.functions]
 }
 
 resource "azurerm_key_vault_secret" "postgres_admin_password" {

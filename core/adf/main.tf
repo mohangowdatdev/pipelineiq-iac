@@ -56,3 +56,30 @@ resource "azurerm_role_assignment" "adf_databricks_contributor" {
   role_definition_name = "Contributor"
   principal_id         = azurerm_data_factory.this.identity[0].principal_id
 }
+
+# ------------------------------------------------------------
+# Diagnostics — stream pipeline/activity/trigger runs to Log Analytics
+# (pipelineiq-logs-dev). Phase 3 failure detection reads ADF run failures
+# from here. build_order 6.6.
+# ------------------------------------------------------------
+resource "azurerm_monitor_diagnostic_setting" "adf" {
+  name                       = "${var.name}-diagnostics"
+  target_resource_id         = azurerm_data_factory.this.id
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+
+  enabled_log {
+    category = "PipelineRuns"
+  }
+
+  enabled_log {
+    category = "ActivityRuns"
+  }
+
+  enabled_log {
+    category = "TriggerRuns"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
+  }
+}

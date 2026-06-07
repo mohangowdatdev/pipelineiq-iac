@@ -37,6 +37,7 @@ KEY_VAULT_BASE_URL="$(terraform output -raw key_vault_uri)"
 ADLS_DFS_ENDPOINT="$(terraform output -raw adls_primary_dfs_endpoint)"
 DBX_WORKSPACE_URL="$(terraform output -raw databricks_workspace_url)"
 DBX_WORKSPACE_ARM_ID="$(terraform output -raw databricks_workspace_arm_id)"
+FUNCTION_APP_URL="https://$(terraform output -raw functions_default_hostname)"
 popd >/dev/null
 
 echo "  factoryName               = $FACTORY_NAME"
@@ -44,6 +45,7 @@ echo "  keyVaultBaseUrl           = $KEY_VAULT_BASE_URL"
 echo "  adlsDfsEndpoint           = $ADLS_DFS_ENDPOINT"
 echo "  databricksWorkspaceUrl    = $DBX_WORKSPACE_URL"
 echo "  databricksWorkspaceArmId  = $DBX_WORKSPACE_ARM_ID"
+echo "  functionAppUrl            = $FUNCTION_APP_URL"
 
 echo "Deploying bicep/adf/main.bicep to $RESOURCE_GROUP (mode=incremental${MODE_FLAG:+, $MODE_FLAG})..."
 az deployment group create \
@@ -56,6 +58,7 @@ az deployment group create \
     adlsDfsEndpoint="$ADLS_DFS_ENDPOINT" \
     databricksWorkspaceUrl="$DBX_WORKSPACE_URL" \
     databricksWorkspaceResourceId="$DBX_WORKSPACE_ARM_ID" \
+    functionAppUrl="$FUNCTION_APP_URL" \
   $MODE_FLAG
 
 echo "Done. Linked services + datasets published to $FACTORY_NAME."

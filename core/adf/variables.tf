@@ -31,6 +31,11 @@ variable "databricks_workspace_id" {
   type        = string
 }
 
+variable "log_analytics_workspace_id" {
+  description = "Resource ID of the Log Analytics workspace (pipelineiq-logs-dev) ADF pipeline/activity/trigger run logs stream to. Required for Phase 3 failure detection. build_order 6.6."
+  type        = string
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
