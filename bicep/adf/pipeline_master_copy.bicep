@@ -83,6 +83,13 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
       {
         name: 'GetEntities'
         type: 'AzureFunctionActivity'
+        // Retry transient Flex-Consumption Function cold-start 503s (the nightly
+        // fire + the post-medallion LogRunEnd both hit a scaled-to-zero app). S20.
+        policy: {
+          retry: 4
+          retryIntervalInSeconds: 30
+          timeout: '0.00:10:00'
+        }
         linkedServiceName: {
           referenceName: functionLinkedServiceName
           type: 'LinkedServiceReference'
@@ -96,6 +103,13 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
       {
         name: 'LogRunStart'
         type: 'AzureFunctionActivity'
+        // Retry transient Flex-Consumption Function cold-start 503s (the nightly
+        // fire + the post-medallion LogRunEnd both hit a scaled-to-zero app). S20.
+        policy: {
+          retry: 4
+          retryIntervalInSeconds: 30
+          timeout: '0.00:10:00'
+        }
         dependsOn: [
           { activity: 'GetEntities', dependencyConditions: ['Succeeded'] }
         ]
@@ -130,6 +144,13 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
             {
               name: 'LogEntityStart'
               type: 'AzureFunctionActivity'
+        // Retry transient Flex-Consumption Function cold-start 503s (the nightly
+        // fire + the post-medallion LogRunEnd both hit a scaled-to-zero app). S20.
+        policy: {
+          retry: 4
+          retryIntervalInSeconds: 30
+          timeout: '0.00:10:00'
+        }
               linkedServiceName: {
                 referenceName: functionLinkedServiceName
                 type: 'LinkedServiceReference'
@@ -225,6 +246,13 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
             {
               name: 'RegisterFile'
               type: 'AzureFunctionActivity'
+        // Retry transient Flex-Consumption Function cold-start 503s (the nightly
+        // fire + the post-medallion LogRunEnd both hit a scaled-to-zero app). S20.
+        policy: {
+          retry: 4
+          retryIntervalInSeconds: 30
+          timeout: '0.00:10:00'
+        }
               dependsOn: [
                 { activity: 'CopyToLanding', dependencyConditions: ['Succeeded'] }
               ]
@@ -247,6 +275,13 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
             {
               name: 'CommitWatermark'
               type: 'AzureFunctionActivity'
+        // Retry transient Flex-Consumption Function cold-start 503s (the nightly
+        // fire + the post-medallion LogRunEnd both hit a scaled-to-zero app). S20.
+        policy: {
+          retry: 4
+          retryIntervalInSeconds: 30
+          timeout: '0.00:10:00'
+        }
               dependsOn: [
                 { activity: 'RegisterFile', dependencyConditions: ['Succeeded'] }
               ]
@@ -266,6 +301,13 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
             {
               name: 'LogEntityEnd'
               type: 'AzureFunctionActivity'
+        // Retry transient Flex-Consumption Function cold-start 503s (the nightly
+        // fire + the post-medallion LogRunEnd both hit a scaled-to-zero app). S20.
+        policy: {
+          retry: 4
+          retryIntervalInSeconds: 30
+          timeout: '0.00:10:00'
+        }
               dependsOn: [
                 { activity: 'CommitWatermark', dependencyConditions: ['Succeeded'] }
               ]
@@ -286,6 +328,13 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
             {
               name: 'LogEntityFailed'
               type: 'AzureFunctionActivity'
+        // Retry transient Flex-Consumption Function cold-start 503s (the nightly
+        // fire + the post-medallion LogRunEnd both hit a scaled-to-zero app). S20.
+        policy: {
+          retry: 4
+          retryIntervalInSeconds: 30
+          timeout: '0.00:10:00'
+        }
               dependsOn: [
                 { activity: 'CopyToLanding', dependencyConditions: ['Failed'] }
               ]
@@ -422,6 +471,13 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
       {
         name: 'LogRunEnd'
         type: 'AzureFunctionActivity'
+        // Retry transient Flex-Consumption Function cold-start 503s (the nightly
+        // fire + the post-medallion LogRunEnd both hit a scaled-to-zero app). S20.
+        policy: {
+          retry: 4
+          retryIntervalInSeconds: 30
+          timeout: '0.00:10:00'
+        }
         dependsOn: [
           { activity: 'AssertMedallion', dependencyConditions: ['Succeeded'] }
         ]
@@ -441,6 +497,13 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
       {
         name: 'LogRunFailedCopy'
         type: 'AzureFunctionActivity'
+        // Retry transient Flex-Consumption Function cold-start 503s (the nightly
+        // fire + the post-medallion LogRunEnd both hit a scaled-to-zero app). S20.
+        policy: {
+          retry: 4
+          retryIntervalInSeconds: 30
+          timeout: '0.00:10:00'
+        }
         dependsOn: [
           { activity: 'ForEachEntity', dependencyConditions: ['Failed'] }
         ]
@@ -460,6 +523,13 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
       {
         name: 'LogRunFailedMedallion'
         type: 'AzureFunctionActivity'
+        // Retry transient Flex-Consumption Function cold-start 503s (the nightly
+        // fire + the post-medallion LogRunEnd both hit a scaled-to-zero app). S20.
+        policy: {
+          retry: 4
+          retryIntervalInSeconds: 30
+          timeout: '0.00:10:00'
+        }
         dependsOn: [
           { activity: 'AssertMedallion', dependencyConditions: ['Failed'] }
         ]
