@@ -210,6 +210,26 @@ module "inventory_workflow" {
   depends_on = [module.databricks_uc]
 }
 
+# Medallion orchestration Job (S20, DECISIONS #78). On-demand only — ADF's
+# pl_master_copy triggers it via run-now. SINGLE_USER cluster created+run as
+# the azure-cli provider principal (mohan.gowda) => Unity Catalog access,
+# fixing the RunMedallion UC failure. The orchestrator notebook is uploaded
+# via scripts/catchup_medallion.py --upload-orchestrator (Architecture repo).
+module "medallion_workflow" {
+  source = "../../core/medallion_workflow"
+
+  providers = {
+    databricks.workspace = databricks.workspace
+  }
+
+  name                    = "${local.name_prefix}-medallion-${local.name_suffix}"
+  workspace_notebook_path = "/Shared/pipelineiq/orchestrate_medallion"
+
+  tags = local.common_tags
+
+  depends_on = [module.databricks_uc]
+}
+
 # ── Tier 6 — Azure Data Factory orchestration backbone ──────────────────────
 # Owns the factory resource + its MI RBAC only. ADF-internal objects (linked
 # services, datasets, pipelines) are Bicep under PipelineIQ-IaC/bicep/adf/,

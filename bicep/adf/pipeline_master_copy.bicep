@@ -28,14 +28,19 @@ param adlsSinkDatasetName string = 'ds_adls_sink'
 @description('Function REST linked service.')
 param functionLinkedServiceName string = 'ls_function'
 
-@description('Databricks (MSI) linked service for the medallion orchestrator.')
-param databricksLinkedServiceName string = 'ls_databricks'
+@description('Databricks workspace URL (https://adb-...), for the Jobs REST API. From terraform output databricks_workspace_url.')
+param databricksWorkspaceUrl string
 
-@description('Workspace path of the medallion orchestrator notebook.')
-param orchestratorNotebookPath string = '/Shared/pipelineiq/orchestrate_medallion'
+@description('Numeric Databricks Job ID of the medallion orchestrator. From terraform output medallion_job_id (core/medallion_workflow).')
+param medallionJobId int
 
 @description('ForEach parallelism. Source is serverless 2-vCore — keep modest.')
 param foreachBatchCount int = 4
+
+// Azure Databricks login application ID — constant across all tenants; the
+// audience the ADF MI requests an AAD token for when calling the Jobs REST API.
+var databricksResourceId = '2ff814a6-3304-4ab8-85cb-cd0e6f879c1d'
+var runNowUrl = '${databricksWorkspaceUrl}/api/2.1/jobs/run-now'
 
 // ── Per-item expressions (ADF expression language; single quotes escaped) ────
 // landing/<table>/date=<run_date>/  (by-date)  or  landing/<table>/full/ (full)
@@ -57,6 +62,20 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
       run_date: {
         type: 'String'
         defaultValue: '@formatDateTime(adddays(utcnow(), -1), \'yyyy-MM-dd\')'
+      }
+    }
+    // Latched out of the Until poll loop — activities inside a control-flow
+    // container (Until/ForEach/If) are not referenceable from outside it, so
+    // GetMedallionRun's terminal state is copied into these for AssertMedallion.
+    variables: {
+      medallion_life_cycle: {
+        type: 'String'
+      }
+      medallion_result_state: {
+        type: 'String'
+      }
+      medallion_state_message: {
+        type: 'String'
       }
     }
     activities: [
@@ -287,21 +306,127 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
         }
       }
       // ── 4. Run the medallion (bronze->silver->gold) ───────────────────────
+      // Option 1 (DECISIONS #78): the medallion is a Terraform-defined
+      // Databricks Job (core/medallion_workflow) running on a SINGLE_USER
+      // cluster (=> Unity Catalog access). ADF triggers it via the Jobs REST
+      // API (MSI auth) and polls to completion, rather than spawning the
+      // cluster itself (which lacked SINGLE_USER and failed the UC write).
       {
-        name: 'RunMedallion'
-        type: 'DatabricksNotebook'
+        name: 'StartMedallion'
+        type: 'WebActivity'
         dependsOn: [
           { activity: 'ForEachEntity', dependencyConditions: ['Succeeded'] }
         ]
-        linkedServiceName: {
-          referenceName: databricksLinkedServiceName
-          type: 'LinkedServiceReference'
-        }
         typeProperties: {
-          notebookPath: orchestratorNotebookPath
-          baseParameters: {
-            pipeline_run_id: '@pipeline().RunId'
+          url: runNowUrl
+          method: 'POST'
+          authentication: {
+            type: 'MSI'
+            resource: databricksResourceId
           }
+          body: {
+            job_id: medallionJobId
+            notebook_params: {
+              pipeline_run_id: '@{pipeline().RunId}'
+            }
+          }
+        }
+      }
+      // Poll runs/get until the run reaches a terminal life-cycle state.
+      {
+        name: 'PollMedallion'
+        type: 'Until'
+        dependsOn: [
+          { activity: 'StartMedallion', dependencyConditions: ['Succeeded'] }
+        ]
+        typeProperties: {
+          expression: {
+            value: '@or(or(equals(variables(\'medallion_life_cycle\'), \'TERMINATED\'), equals(variables(\'medallion_life_cycle\'), \'INTERNAL_ERROR\')), equals(variables(\'medallion_life_cycle\'), \'SKIPPED\'))'
+            type: 'Expression'
+          }
+          timeout: '02:00:00'
+          activities: [
+            {
+              name: 'WaitPoll'
+              type: 'Wait'
+              typeProperties: {
+                waitTimeInSeconds: 20
+              }
+            }
+            {
+              name: 'GetMedallionRun'
+              type: 'WebActivity'
+              dependsOn: [
+                { activity: 'WaitPoll', dependencyConditions: ['Succeeded'] }
+              ]
+              typeProperties: {
+                url: '@concat(\'${databricksWorkspaceUrl}/api/2.1/jobs/runs/get?run_id=\', string(activity(\'StartMedallion\').output.run_id))'
+                method: 'GET'
+                authentication: {
+                  type: 'MSI'
+                  resource: databricksResourceId
+                }
+              }
+            }
+            {
+              name: 'LatchLifeCycle'
+              type: 'SetVariable'
+              dependsOn: [
+                { activity: 'GetMedallionRun', dependencyConditions: ['Succeeded'] }
+              ]
+              typeProperties: {
+                variableName: 'medallion_life_cycle'
+                value: '@activity(\'GetMedallionRun\').output.state.life_cycle_state'
+              }
+            }
+            {
+              name: 'LatchResultState'
+              type: 'SetVariable'
+              dependsOn: [
+                { activity: 'LatchLifeCycle', dependencyConditions: ['Succeeded'] }
+              ]
+              typeProperties: {
+                variableName: 'medallion_result_state'
+                value: '@coalesce(activity(\'GetMedallionRun\').output.state.result_state, \'\')'
+              }
+            }
+            {
+              name: 'LatchStateMessage'
+              type: 'SetVariable'
+              dependsOn: [
+                { activity: 'LatchResultState', dependencyConditions: ['Succeeded'] }
+              ]
+              typeProperties: {
+                variableName: 'medallion_state_message'
+                value: '@coalesce(activity(\'GetMedallionRun\').output.state.state_message, \'\')'
+              }
+            }
+          ]
+        }
+      }
+      // Convert a non-SUCCESS terminal result into an activity failure so the
+      // run-log closers below fire correctly.
+      {
+        name: 'AssertMedallion'
+        type: 'IfCondition'
+        dependsOn: [
+          { activity: 'PollMedallion', dependencyConditions: ['Succeeded'] }
+        ]
+        typeProperties: {
+          expression: {
+            value: '@equals(variables(\'medallion_result_state\'), \'SUCCESS\')'
+            type: 'Expression'
+          }
+          ifFalseActivities: [
+            {
+              name: 'FailMedallion'
+              type: 'Fail'
+              typeProperties: {
+                message: '@concat(\'medallion run failed (\', variables(\'medallion_result_state\'), \'): \', variables(\'medallion_state_message\'))'
+                errorCode: 'MedallionFailed'
+              }
+            }
+          ]
         }
       }
       // ── 5. Close the master run-log row ───────────────────────────────────
@@ -309,7 +434,7 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
         name: 'LogRunEnd'
         type: 'AzureFunctionActivity'
         dependsOn: [
-          { activity: 'RunMedallion', dependencyConditions: ['Succeeded'] }
+          { activity: 'AssertMedallion', dependencyConditions: ['Succeeded'] }
         ]
         linkedServiceName: {
           referenceName: functionLinkedServiceName
@@ -347,7 +472,7 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
         name: 'LogRunFailedMedallion'
         type: 'AzureFunctionActivity'
         dependsOn: [
-          { activity: 'RunMedallion', dependencyConditions: ['Failed'] }
+          { activity: 'AssertMedallion', dependencyConditions: ['Failed'] }
         ]
         linkedServiceName: {
           referenceName: functionLinkedServiceName
@@ -358,7 +483,7 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
           method: 'POST'
           body: {
             status: 'failed'
-            error_message: '@concat(\'RunMedallion failed: \', coalesce(activity(\'RunMedallion\').error.message, \'unknown\'))'
+            error_message: '@concat(\'RunMedallion failed (\', variables(\'medallion_result_state\'), \'): \', variables(\'medallion_state_message\'))'
           }
         }
       }

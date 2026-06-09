@@ -161,3 +161,8 @@ output "adf_principal_id" {
   description = "Object ID of the ADF MSI. Surfaced as a Databricks workspace user on first REST call (chunk 2)."
   value       = module.adf.principal_id
 }
+
+output "medallion_job_id" {
+  description = "Numeric Databricks Job ID of the medallion orchestrator. Passed to ADF (deploy_adf.sh -> medallionJobId) so pl_master_copy can run-now it."
+  value       = module.medallion_workflow.job_id
+}

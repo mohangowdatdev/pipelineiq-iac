@@ -28,6 +28,9 @@ param databricksWorkspaceResourceId string
 @description('Function App base URL, e.g. https://pipelineiq-functions-dev.azurewebsites.net (chunk 2).')
 param functionAppUrl string
 
+@description('Numeric Databricks Job ID of the medallion orchestrator (terraform output medallion_job_id). pl_master_copy run-nows it.')
+param medallionJobId int
+
 // ── Linked services ────────────────────────────────────────────────────────
 
 module lsKeyVault 'linkedservice_keyvault.bicep' = {
@@ -106,12 +109,13 @@ module plMasterCopy 'pipeline_master_copy.bicep' = {
   name: 'pl_master_copy'
   params: {
     factoryName: factoryName
+    databricksWorkspaceUrl: databricksWorkspaceUrl
+    medallionJobId: medallionJobId
   }
   dependsOn: [
     dsSqlSource
     dsAdlsSink
     lsFunction
-    lsDatabricks
   ]
 }
 
