@@ -67,14 +67,14 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
     // Latched out of the Until poll loop — activities inside a control-flow
     // container (Until/ForEach/If) are not referenceable from outside it, so
     // GetMedallionRun's terminal state is copied into these for AssertMedallion.
+    // state is stored as a STRING (the whole Databricks run state JSON): ADF
+    // throws on accessing `result_state` while the run is mid-flight (the field
+    // only appears once terminal), so we string-match it instead of dotting in.
     variables: {
       medallion_life_cycle: {
         type: 'String'
       }
-      medallion_result_state: {
-        type: 'String'
-      }
-      medallion_state_message: {
+      medallion_state_json: {
         type: 'String'
       }
     }
@@ -380,25 +380,14 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
               }
             }
             {
-              name: 'LatchResultState'
+              name: 'LatchStateJson'
               type: 'SetVariable'
               dependsOn: [
                 { activity: 'LatchLifeCycle', dependencyConditions: ['Succeeded'] }
               ]
               typeProperties: {
-                variableName: 'medallion_result_state'
-                value: '@coalesce(activity(\'GetMedallionRun\').output.state.result_state, \'\')'
-              }
-            }
-            {
-              name: 'LatchStateMessage'
-              type: 'SetVariable'
-              dependsOn: [
-                { activity: 'LatchResultState', dependencyConditions: ['Succeeded'] }
-              ]
-              typeProperties: {
-                variableName: 'medallion_state_message'
-                value: '@coalesce(activity(\'GetMedallionRun\').output.state.state_message, \'\')'
+                variableName: 'medallion_state_json'
+                value: '@string(activity(\'GetMedallionRun\').output.state)'
               }
             }
           ]
@@ -414,7 +403,7 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
         ]
         typeProperties: {
           expression: {
-            value: '@equals(variables(\'medallion_result_state\'), \'SUCCESS\')'
+            value: '@contains(variables(\'medallion_state_json\'), \'"result_state":"SUCCESS"\')'
             type: 'Expression'
           }
           ifFalseActivities: [
@@ -422,7 +411,7 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
               name: 'FailMedallion'
               type: 'Fail'
               typeProperties: {
-                message: '@concat(\'medallion run failed (\', variables(\'medallion_result_state\'), \'): \', variables(\'medallion_state_message\'))'
+                message: '@concat(\'medallion run failed: \', variables(\'medallion_state_json\'))'
                 errorCode: 'MedallionFailed'
               }
             }
@@ -483,7 +472,7 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
           method: 'POST'
           body: {
             status: 'failed'
-            error_message: '@concat(\'RunMedallion failed (\', variables(\'medallion_result_state\'), \'): \', variables(\'medallion_state_message\'))'
+            error_message: '@concat(\'RunMedallion failed: \', variables(\'medallion_state_json\'))'
           }
         }
       }
