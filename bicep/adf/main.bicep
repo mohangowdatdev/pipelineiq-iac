@@ -119,9 +119,10 @@ module plMasterCopy 'pipeline_master_copy.bicep' = {
   ]
 }
 
-// Created Stopped — started only at cutover (build_order 6.11).
+// Created Stopped — started at cutover (build_order 6.11). 01:00 UTC (renamed
+// from trg_daily_0040; 00:40 was too tight after the 00:35 inventory Job).
 module trgDaily 'trigger_daily.bicep' = {
-  name: 'trg_daily_0040'
+  name: 'trg_daily_0100'
   params: {
     factoryName: factoryName
   }
