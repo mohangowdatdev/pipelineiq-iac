@@ -377,6 +377,9 @@ resource pl_master_copy 'Microsoft.DataFactory/factories/pipelines@2018-06-01' =
             job_id: medallionJobId
             notebook_params: {
               pipeline_run_id: '@{pipeline().RunId}'
+              // Scope Bronze ingestion to this pipeline's run_date (DECISIONS #82):
+              // the medallion ingests only this day's landing partition, idempotently.
+              run_date: '@{pipeline().parameters.run_date}'
             }
           }
         }
